@@ -1,0 +1,4 @@
+# cordis.patch.yml — dsh profile overlay mounting dsh-plugin-security.
+- insert:
+    - id: plugin-security
+      name: dsh-plugin-security
