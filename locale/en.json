@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Security Gate",
+    "description": "Dependency advisories and contextual static evidence for plugin review. API usage alone is not a malware verdict; automatic disabling requires a high-confidence malicious review."
+  }
+}

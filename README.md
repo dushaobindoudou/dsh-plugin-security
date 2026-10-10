@@ -1,108 +1,109 @@
 # dsh-plugin-security
 
-[中文](./README.zh-CN.md) · [npm](https://www.npmjs.com/package/dsh-plugin-security) · [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+[中文](README.zh-CN.md) · [npm](https://www.npmjs.com/package/dsh-plugin-security) · [Changelog](CHANGELOG.md)
 
-**Know what a plugin can do before you let it in — and before every update.**
-`dsh-plugin-security` is the supply-chain gate for DeepSeek Harness: audit any npm
-plugin before installing it, and diff what an update changes. It reads the code a
-package actually ships, then reports the permission profile with file:line evidence.
+Plugin security review for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): dependency advisories, source evidence, AI-assisted contextual review, and reversible enforcement. Includes a Web settings page and agent tools.
 
-The dsh plugin shop explicitly does not sandbox plugins: once loaded, a plugin
-reaches your full `ctx` — filesystem, shell, and the requests your model sends.
-This plugin is the missing gate in front of that door.
+**Using `fetch`, `process.env`, filesystem APIs, or subprocesses is not a malware verdict.** Ordinary API matches are capability records. Local data and execution links identify evidence to investigate; an agent reviews the purpose, destination, and authorization before recording a verdict.
+
+## Install
+
+Use a current dsh installation with `@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2`. The plugin requires Node.js 20+; use the Node.js version required by your dsh distribution (Node.js 24 recommended).
+
+```sh
+# Add to your existing Web profile, then restart its running host.
+dsh plugin --profile web add dsh-plugin-security@latest
+dsh --profile web
+```
+
+Open **Settings → Security Gate**. The package declares the standard `dsh.bundle` patch and `dsh.client` Web entry point; you do not need to edit the profile manifest manually. For another existing profile, replace `web` with its name. Agent tools work without the Web connection service; the host must provide `tools`, `pluginManager`, and `typert`.
+
+To enable the bundled review skill for your agent, link it from the installed package (adjust the profile and `DSH_HOME` if needed):
+
+```sh
+mkdir -p "${DSH_HOME:-$HOME/.dsh}/skills"
+ln -sfn "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/dsh-plugin-security/skills/dsh-plugin-security" \
+  "${DSH_HOME:-$HOME/.dsh}/skills/dsh-plugin-security"
+```
+
+To remove the plugin:
+
+```sh
+dsh plugin --profile web remove dsh-plugin-security
+```
+
+The separately linked skill and stored reports remain until you remove them.
 
 ## What it does
 
-**1. `plugin_security` — pre-install audit.** Give it an npm package name (or a
-local plugin directory). It downloads the tarball straight from the registry,
-scans the shipped files, and returns a permission card:
+- Audits installed dependency versions against npm advisories; looks up fix versions through OSV. Network failures remain **unknown**, rather than becoming clean cached results.
+- Reads source and text files without executing target code. Evidence includes file, line, snippet, and whether it comes from runtime, support material, or dependency code.
+- Uses bounded JavaScript AST analysis to identify local links such as whole-environment data entering a request body or decoded text entering an execution API. Package-wide co-occurrence alone does not escalate risk.
+- Reuses scans by package version, content fingerprint, and screening-rule revision. Content or rule changes trigger another scan; force rescan is available.
+- Provides searchable risk and action tabs, a whitelist, per-plugin actions, JSON/Markdown export, compact scan statistics, and bilingual settings metadata.
+- Offers reversible disabling after a high-confidence malicious review, with profile backups and a bounded action log.
 
-```markdown
-## Plugin security: some-plugin@1.2.3
+## Risk labels and actions
 
-**Risk: REVIEW** — Human review recommended before installing this version.
+| Label | Meaning |
+| --- | --- |
+| High risk | High-confidence malicious review, or a high/critical dependency advisory. |
+| At risk | Behavior requiring review, other advisories, uncertain reviews, incomplete scans, or failed checks. |
+| No risk found | No actionable risk found within this scan's scope. Capability records alone do not change this label. This is not a safety guarantee. |
+| Whitelist | Checks were skipped. These entries are separate from “No risk found.” |
 
-| Surface | Observed |
-|---|---|
-| Install scripts | no |
-| Filesystem read | **yes** |
-| Child processes | **yes** |
-| Network | **yes** |
-| Credential access | **yes** |
-| Outbound hosts | `api.github.com`, `registry.npmjs.org` |
-| Credential-looking env | `GITHUB_TOKEN` |
+Risk labels and actions are independent. A high-risk label does **not** automatically disable a plugin. The old A–F grades are no longer shown; legacy report fields remain for compatibility.
+
+## Configuration
+
+Configure these options in the settings page; configuration is stored under `$DSH_HOME/plugin-security/state.json` (default `~/.dsh/plugin-security/state.json`).
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| Mode | `report-only` | `off`: no scans or enforcement. `report-only`: scan and save reports without changing target plugins. `enforce`: apply review-gated disabling. |
+| Automatic disable threshold | `critical` | `never` disables automatic enforcement. `critical` and `high` both cover a confirmed high-confidence malicious review, treated as critical for enforcement. Static matches and advisories alone never trigger automatic quarantine. |
+| Upgrade suggestions | `false` | Suggest dependency upgrade commands when enabled; commands are not silently executed. |
+| Whitelist | Built-in protected entries | Add/remove custom package names through the whitelist tab or each plugin row. Entries skip checks; built-in protected entries cannot be removed in the UI. |
+
+Automatic disabling also requires `enforce` mode and an unprotected target. It removes the bundle from the profile and renames the package directory with a `.security-quarantined` suffix. **Restart dsh for the change to take effect.** Undo restores the bundle and directory. Self and built-in protected packages cannot be disabled or uninstalled through this plugin; the server enforces this restriction.
+
+The scan state and action log are local. Profile edits use atomic writes and keep up to five rolling snapshots; the state retains up to 200 action-log entries. State directories/files use permissions `0700`/`0600` where supported.
+
+## Agent tools
+
+```text
+security_scan { package?, force?, evidence? }
+security_review { package, verdict, confidence?, reason? }
 ```
 
-Every finding carries `file:line` evidence, so you can jump straight to the code
-that triggered it. The scan is read-only by construction: nothing is written to
-disk, and tarballs are parsed in memory.
+`verdict` is `malicious`, `suspicious`, or `benign`; `confidence` is `high`, `medium`, or `low`. A high-confidence benign review can resolve static concerns, but does not remove dependency advisory facts. Suspicious or uncertain reviews require human follow-up.
 
-**2. `plugin_security_diff` — update gate.** The classic supply-chain attack
-isn't the version you reviewed — it's the next one. Point the diff at two
-versions and it reports what the update **adds**:
+The bundled [review skill](skills/dsh-plugin-security/SKILL.md) treats target source, comments, README, and skill text as untrusted evidence. Reports do not themselves invoke a model; contextual review uses your dsh agent and its configured tools/provider.
 
-```markdown
-## Plugin security diff: some-plugin 1.2.3 → 1.3.0
+## Privacy and limits
 
-**Risk: BLOCK** — this update adds an install script and credential access.
+Dependency auditing sends package names and installed versions to npm, and advisory IDs to OSV for fix lookup. These requests do not upload source code or local paths. Agent-assisted review follows your configured model provider's data handling; evidence passed to an agent may contain source snippets.
 
-- Capabilities added: install-script, credential-access, network
-- New outbound hosts: `collector.evil.example.com`
-```
+This is **post-load inspection**, not a sandbox or a pre-install execution barrier. The inspector and plugins share the host process and permissions. Static analysis is bounded (including file/byte budgets) and does not cover all cross-file flows, dynamic behavior, network transports, or transitive vulnerabilities. Truncated or failed checks remain visible. Whitelisting deliberately removes coverage. Review verdicts are stored locally and are not an independent cryptographic trust guarantee.
 
-Risk is judged on the **delta**, not on what you already accepted in the old
-version — an update that only fixes a bug stays clean even if the plugin
-always had filesystem access.
-
-## Detection model
-
-| Capability | Examples | Severity |
-|---|---|---|
-| `install-script` | `postinstall` in package.json | critical — the classic npm attack vector |
-| `credential-access` | `.npmrc`, `_authToken`, `~/.ssh`, `.aws/credentials`, mnemonics | review |
-| `fs-write` | `writeFile`, `rm`, `rename`, `mkdir` | review |
-| `subprocess` | `spawn`, `exec`, `execSync` | review |
-| `dynamic-exec` | `eval`, `new Function`, `vm.*` | review |
-| `obfuscation` | long base64 literals, encoded payloads | review |
-| `network` | `fetch`, `https.request`, axios | notice |
-| `env-access` | `process.env.*` | notice |
-| `fs-read` | `readFile`, `readdir`, `stat` | notice |
-
-**Risk levels** are deliberately conservative:
-
-- **block** — an install script paired with network / subprocess / credential /
-  write / obfuscation access (the known attack shape), or obfuscated code that
-  also touches credentials and executes dynamically.
-- **review** — dangerous capabilities present, but in shapes that can be legitimate
-  (a file manager needs filesystem access; a scanner references `.npmrc` to detect it).
-- **notice** — read-only surfaces only.
-- **clean** — nothing observed.
-
-The tool surfaces evidence; you decide. It is not a verdict.
-
-## Installation
+## Development and release
 
 ```sh
-dsh plugin --profile web add dsh-plugin-security
+corepack pnpm install --frozen-lockfile
+pnpm test
+npm pack --dry-run
 ```
 
-Then, inside the harness:
+Tests cover detection and false-positive cases, profiles, cache invalidation, reversible disposition, settings behavior, and real Cordis/Typert/gateway RPC lifecycles. Shared host protocol packages are declared as peer and development dependencies per the [dsh packaging guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md).
 
-> Audit this plugin before we install it: use plugin_security on "some-package".
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps. Runtime JavaScript is shipped directly; consumers need no build script or install-time code execution from this package.
 
-> Before updating dsh-plugin-shop from 0.8.0 to 0.8.5, run plugin_security_diff and tell me what changed.
+## Troubleshooting HTTP 404
 
-## Design notes
+`transport failure for /api/security/status: HTTP 404` means the host has not registered the settings RPC route. Upgrade this plugin, check the protocol peer version, and restart dsh. The plugin registers an explicit host contract and follows the Web connection service lifecycle.
 
-- **Zero runtime dependencies.** Tarball download uses `fetch`; tar parsing is a
-  small in-memory reader — no `child_process`, no temp files.
-- **Scans what ships, not what's committed.** `dist/` and `lib/` are in scope;
-  only `node_modules` and `.git` are skipped.
-- **Registry-configurable.** Works against npmmirror or a corporate registry via
-  the `registry` option.
-- **Read-only by construction.** The only side effects are network GETs to the
-  registry you configure.
+Look for `plugin-security: RPC contract registration failed` or `Fetch route registration failed` in host logs. `$DSH_HOME/plugin-security/remote-diag.json` records observed service and route registration state. Headless profiles without a Web connection use the agent tools instead.
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 dushaobindoudou.

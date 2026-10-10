@@ -1,44 +1,70 @@
 {
   "name": "dsh-plugin-security",
-  "version": "0.1.0",
-  "description": "Supply-chain security gate for DeepSeek Harness: audit any npm plugin before you install it, and diff what an update changes — new install scripts, credential access, network hosts, subprocess or dynamic execution, with file:line evidence.",
+  "version": "0.4.6",
+  "description": "Plugin security review for DeepSeek Harness: dependency advisories, contextual static evidence, and reversible review-gated enforcement.",
   "type": "module",
-  "main": "./lib/index.js",
+  "license": "MIT",
+  "author": "dushaobindoudou",
+  "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
-    "./scanner": "./lib/scanner.js",
-    "./package.json": "./package.json"
+    "./scan": "./lib/scan.js",
+    "./screen": "./lib/screen.js",
+    "./audit": "./lib/audit.js",
+    "./state": "./lib/state.js",
+    "./disposition": "./lib/disposition.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
+  "icon": "./icon.svg",
   "files": [
-    "lib",
+    "lib/**/*.js",
+    "locale/*.json",
+    "icon.svg",
     "cordis.patch.yml",
+    "skills/**/SKILL.md",
     "README.md",
-    "README.zh-CN.md"
+    "README.zh-CN.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md"
   ],
   "scripts": {
-    "test": "node test/smoke.js"
+    "test": "node --test \"test/*.test.js\"",
+    "prepublishOnly": "npm test"
   },
   "engines": {
-    "node": ">=20.0.0"
-  },
-  "peerDependencies": {
-    "cordis": "^4.0.0-rc.7",
-    "schemastery": "^3.18.0"
+    "node": ">=20"
   },
   "keywords": [
-    "deepseek-harness",
-    "dsh",
     "dsh-plugin",
-    "cordis-plugin",
+    "deepseek-harness",
     "security",
-    "supply-chain",
-    "npm-audit",
-    "plugin-security",
-    "install-gate",
-    "version-diff"
+    "audit",
+    "vulnerability",
+    "malware-screening",
+    "cordis-plugin"
   ],
-  "author": "dushaobindoudou",
-  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "dependencies": {
+    "acorn": "8.19.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-invariants": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-registry": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dushaobindoudou/dsh-plugin-security.git"
@@ -47,12 +73,12 @@
   "bugs": {
     "url": "https://github.com/dushaobindoudou/dsh-plugin-security/issues"
   },
-  "dsh": {
-    "client": {
-      "platform": "web"
-    },
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2"
   }
 }

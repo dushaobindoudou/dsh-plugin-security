@@ -1,0 +1,11 @@
+node_modules/
+*.tgz
+.DS_Store
+.env
+.env.*
+!.env.example
+.npmrc
+.workbuddy/
+AUDIT.md
+docs/false-positive-review.md
+coverage/

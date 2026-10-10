@@ -1,4 +1,4 @@
-# cordis.patch.yml — dsh profile overlay mounting dsh-plugin-security.
+# The dsh-plugin-security bundle patch: mount exactly one plugin row.
 - insert:
     - id: plugin-security
       name: dsh-plugin-security
