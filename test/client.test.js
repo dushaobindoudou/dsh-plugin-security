@@ -49,6 +49,13 @@ test('only a high-confidence benign review displays a legitimate-use conclusion'
   assert.match(high, /已审读 · 用途合理/);
 });
 
+/** Visible text of a rendered element tree (string children only). */
+function textOf(node) {
+  if (node === null || node === undefined || node === false) return '';
+  if (typeof node !== 'object') return String(node);
+  if (typeof node.type === 'function') return textOf(node.type(node.props));
+  return node.children.map(textOf).join('');
+}
 function nodes(node) {
   if (!node || typeof node !== 'object') return [];
   if (typeof node.type === 'function') return nodes(node.type(node.props));
@@ -181,7 +188,7 @@ test('restored config controls persist threshold and upgrade settings through th
 test('settings enable / disable / reset drive the per-plugin call gate through security/policy', async () => {
   const h = pageHarness();
   const row = () => nodes(h.tree()).filter((n) => n.props.className === 'ps-card').find((n) => render(n).includes('beta-plugin'));
-  const buttons = (node) => nodes(node).filter((n) => n.type === 'button').map((n) => ({ n, text: render(n).replace(/<[^>]+>/g, '') }));
+  const buttons = (node) => nodes(node).filter((n) => n.type === 'button').map((n) => ({ n, text: textOf(n) }));
   const press = (text) => buttons(row()).find((b) => b.text === text).n.props.onClick();
   // high risk without a decision: both enable (pre-approve) and disable are offered
   assert.deepEqual(buttons(row()).map((b) => b.text).filter((t) => ['启用', '禁用', '恢复默认'].includes(t)), ['启用', '禁用']);
