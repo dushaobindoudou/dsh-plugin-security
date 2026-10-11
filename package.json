@@ -81,6 +81,6 @@
   },
   "packageManager": "pnpm@10.28.0",
   "peerDependencies": {
-    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2"
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc.6 <0.3.0"
   }
 }
