@@ -145,14 +145,27 @@ try {
   const remembered = runTask();
   check('a remembered allow runs without asking', ran(remembered) && questions().length === before, JSON.stringify(remembered.result));
 
-  // ---- 4. 禁用 ------------------------------------------------------------
+  // ---- 4. 禁用 → the native plugin manager deselects the bundle ------------
+  const selected = () => JSON.parse(readFileSync(manifestPath, 'utf8')).dsh.profile.bundles.includes('dsh-security-e2e-fixture');
   state.setPolicy('dsh-security-e2e-fixture', null);
   const block = runTask({ E2E_ANSWER: '禁用' });
   check('禁用 denies the call', !ran(block) && /禁用|disabled/i.test(String(block.result?.result)), JSON.stringify(block.result));
-  check('禁用 is stored as block', state.getPolicy('dsh-security-e2e-fixture')?.decision === 'block');
-  const blockedLater = runTask({ E2E_ANSWER: '允许一次' });
-  check('a disabled plugin stays blocked without asking again', !ran(blockedLater) && /不要重试|Do not retry/.test(String(blockedLater.result?.result)),
-    JSON.stringify(blockedLater.result));
+  check('禁用 deselects the bundle through the plugin manager (same as the native Plugins page)', !selected());
+  check('the dependency stays installed, as with a native disable',
+    Object.hasOwn(JSON.parse(readFileSync(manifestPath, 'utf8')).dependencies, 'dsh-security-e2e-fixture'));
+  check('no duplicate gate block is stored when the manager disabled it', state.getPolicy('dsh-security-e2e-fixture') === null,
+    JSON.stringify(state.getPolicy('dsh-security-e2e-fixture')));
+  const asksBefore = questions().length;
+  const disabledRun = runTask({ E2E_ANSWER: '允许一次' });
+  check('a disabled plugin is not loaded: its tool cannot run and nothing is asked', !ran(disabledRun) && questions().length === asksBefore,
+    JSON.stringify(disabledRun.result));
+  // re-enable as the native Plugins page would
+  const restored = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  restored.dsh.profile.bundles.push('dsh-security-e2e-fixture');
+  writeFileSync(manifestPath, `${JSON.stringify(restored, null, 2)}\n`);
+  const reenabled = runTask();
+  check('after a native re-enable the plugin loads again and is gated (asked, not run)', !ran(reenabled) && questions().length > asksBefore,
+    JSON.stringify(reenabled.result));
 
   // ---- 5. settings switch, whitelist and mode off -------------------------
   state.setPolicy('dsh-security-e2e-fixture', { decision: 'allow', version: '1.0.0', by: 'settings' });
@@ -166,7 +179,7 @@ try {
 
   const log = state.readAuditLog();
   check('prompt answers and policy changes are in the audit log',
-    log.some((e) => e.kind === 'gate-ask' && e.choice === 'once') && log.some((e) => e.kind === 'policy-block' && e.by === 'user-prompt'),
+    log.some((e) => e.kind === 'gate-ask' && e.choice === 'once') && log.some((e) => e.kind === 'gate-disable' && e.via === 'plugin-manager'),
     JSON.stringify(log.slice(-6)));
 } catch (error) {
   check('e2e harness', false, error?.stack ?? String(error));

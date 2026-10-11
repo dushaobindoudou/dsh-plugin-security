@@ -8,6 +8,7 @@
 - Scan after every plugin-manager change and on demand when the gate meets a plugin with no record for its installed version, in addition to the startup scan.
 - Retry dependency audits that ended unknown, keep agent reviews across forced rescans of unchanged content, and drop superseded records of the same package.
 - Attribute tools that plugins registered before the gate started by their `execute` source text, so the first call into a newly installed, not yet scanned plugin is gated (found by the e2e run).
+- Disable, enable and uninstall go through the host plugin manager (`setBundleEnabled` / `removeBundle`), the same calls as the native Plugins page, so both pages always agree; the gate denies calls into a bundle deselected on either page, the settings page shows native disables and refreshes on focus, and the gate block / profile-file edit remain only as fallbacks for plugins the manager does not own.
 - Register the bundled review skill with the host skill catalog at startup; the manual skill link is no longer needed.
 - Add `npm run test:e2e`: an isolated headless dsh run with a harmless high-risk fixture plugin, a scripted question answerer and a deterministic local model.
 - Fix `security_review` throwing `ACTION_ICON is not defined` after it had already stored the verdict.

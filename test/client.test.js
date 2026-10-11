@@ -211,3 +211,15 @@ test('the page prefers the host-recorded risk level', () => {
   assert.equal(c.pluginRisk({ ...normal, risk: { level: 'high', reason: 'riskAdvisory' } }).level, 'high');
   assert.equal(c.pluginRisk({ ...normal, deps: { worst: 'none', unknown: true } }).level, 'risk');
 });
+
+test('a bundle disabled on the native Plugins page shows as disabled here, with Enable', () => {
+  const c = client();
+  const t = (key) => c.locales.zh[key] ?? key;
+  const disabled = { ...plugin, screening: { signal: { level: 'none' } }, bundle: { enabled: false } };
+  const html = render(c.PluginCard(t, {}, false, disabled, false, null, null, null, null, null, null, false, () => {}));
+  assert.match(html, /已禁用（插件管理）/);
+  assert.match(html, /与「插件」页同步/);
+  assert.match(html, />启用</);
+  assert.equal(c.matchesFilter(disabled, 'blocked', {}), true);
+  assert.equal(c.matchesFilter({ ...disabled, bundle: { enabled: true } }, 'blocked', {}), false);
+});

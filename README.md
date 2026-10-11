@@ -54,14 +54,14 @@ The gate listens on the host `tools/pre-execute` waterfall and attributes each t
 
 | Situation | Result |
 | --- | --- |
-| Plugin disabled | Denied; the model is told not to retry |
+| Plugin disabled (on the Plugins page or here) | Denied; the model is told not to retry |
 | Installed version not scanned | Scan that plugin first, then apply the rows below |
-| High risk, no decision | Question card: **Allow once** (this call) / **Allow** (remembered for this version; a new version asks again) / **Disable** (deny every later call from the plugin) |
+| High risk, no decision | Question card: **Allow once** (this call) / **Allow** (remembered for this version; a new version asks again) / **Disable** (disable the plugin through the plugin manager, the same as the Plugins page) |
 | At risk, no risk, whitelisted or protected | Passed on to the host's remaining policies |
 
 The card uses the host `ctx.userQuestions` service, the channel dsh itself uses to ask the user structured questions. When no card can be shown (no web client, a delegated child agent) the gate falls back to the native approval prompt (allow once / reject). Concurrent calls into one plugin share one question.
 
-Each plugin row in the settings page has **Enable / Disable / Reset**: Enable equals Allow, Disable blocks every tool call, Reset returns to risk-based asking. Decisions live under `policies` in the state file and apply on the next call without a restart. Mode `off` disables the gate.
+Each plugin row in the settings page has **Enable / Disable / Reset** and **Uninstall**, in step with dsh's native Plugins page: disable, enable and uninstall call the host plugin manager (`setBundleEnabled` / `removeBundle`) exactly as that page does. A plugin disabled on the Plugins page shows here as "Disabled (plugin manager)", and while it is still loaded (until restart) its tool calls are blocked. Enable also allows the current version of a high-risk plugin; Reset returns to risk-based asking. Only plugins the manager cannot handle (not bundles) fall back to this plugin's own block record (`policies` in the state file). The page refreshes when it regains focus. Mode `off` disables the gate.
 
 Only tool calls are gated; hooks, system-prompt contributions and web UI from a plugin do not pass through `tools/pre-execute`. If the gate fails internally the call proceeds with a logged warning, but a disabled plugin is still denied.
 
@@ -87,7 +87,7 @@ Configure these options in the settings page; configuration is stored under `$DS
 | Upgrade suggestions | `false` | Suggest dependency upgrade commands when enabled; commands are not silently executed. |
 | Whitelist | Built-in protected entries | Add/remove custom package names through the whitelist tab or each plugin row. Entries skip checks; built-in protected entries cannot be removed in the UI. |
 
-Automatic disabling also requires `enforce` mode and an unprotected target. It removes the bundle from the profile and renames the package directory with a `.security-quarantined` suffix. **Restart dsh for the change to take effect.** Undo restores the bundle and directory. Self and built-in protected packages cannot be disabled or uninstalled through this plugin; the server enforces this restriction.
+Automatic disabling also requires `enforce` mode and an unprotected target. It disables the bundle through the plugin manager, in step with the Plugins page; only when the manager cannot handle the plugin does it remove the bundle from the profile and rename the package directory with a `.security-quarantined` suffix. **Restart dsh for that fallback to take effect.** Undo restores the bundle and directory. Self and built-in protected packages cannot be disabled or uninstalled through this plugin; the server enforces this restriction.
 
 The scan state and action log are local. Profile edits use atomic writes and keep up to five rolling snapshots; the state retains up to 200 action-log entries. State directories/files use permissions `0700`/`0600` where supported.
 

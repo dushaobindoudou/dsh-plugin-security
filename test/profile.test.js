@@ -315,7 +315,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
 
   // a confident benign review overrides the static signal
   const enforce = { mode: 'enforce', autoDisableAt: 'critical' };
-  const benign = redecideEntry(
+  const benign = await redecideEntry(
     { ...recorded, review: { verdict: 'benign', confidence: 'high', reason: 'test', by: 'agent', at: new Date().toISOString() } },
     enforce, env.profileRoot,
   );
@@ -325,7 +325,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
 
   // a malicious review disables (profile edit) even from report-only mode
   const reportOnlyConfig = { mode: 'enforce', autoDisableAt: 'critical' };
-  const malicious = redecideEntry(
+  const malicious = await redecideEntry(
     { ...recorded, review: { verdict: 'malicious', confidence: 'high', reason: 'test', by: 'agent', at: new Date().toISOString() } },
     reportOnlyConfig, env.profileRoot,
   );
@@ -336,7 +336,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
   const afterManifest = JSON.parse(readFileSync(join(env.profileRoot, 'package.json'), 'utf8'));
   assert.ok(!afterManifest.dsh.profile.bundles.includes('evil-pkg'), 'malicious verdict removes the plugin');
   // low-confidence malicious must NOT disable (audit P1-10 regression)
-  const lowConf = redecideEntry(
+  const lowConf = await redecideEntry(
     { ...recorded, review: { verdict: 'malicious', confidence: 'low', reason: 'gut', by: 'agent', at: new Date().toISOString() } },
     reportOnlyConfig, env.profileRoot,
   );
