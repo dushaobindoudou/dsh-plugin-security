@@ -1,0 +1,27 @@
+name: False positive or missed finding
+description: The scanner labeled a plugin wrongly, or missed something it should report.
+labels: [detection]
+body:
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and version
+      placeholder: some-plugin@1.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - False positive (labeled riskier than it is)
+        - Missed finding (labeled safer than it is)
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: Finding
+      description: Rule id, file:line and snippet from the report, and why the label is wrong. Public packages only; never paste private source.
+    validations:
+      required: true

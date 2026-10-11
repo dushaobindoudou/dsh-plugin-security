@@ -41,13 +41,17 @@
     "node": ">=20"
   },
   "keywords": [
-    "dsh-plugin",
-    "deepseek-harness",
-    "security",
     "audit",
-    "vulnerability",
+    "cordis-plugin",
+    "deepseek-harness",
+    "dsh-plugin",
     "malware-screening",
-    "cordis-plugin"
+    "npm-audit",
+    "plugin-security",
+    "security",
+    "supply-chain-security",
+    "tool-call-gate",
+    "vulnerability"
   ],
   "dsh": {
     "bundle": {
