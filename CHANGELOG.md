@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- Add the call-time gate: every tool call is attributed to the plugin that registered it and checked in `tools/pre-execute`. A call into a high-risk plugin asks the user **Allow once / Allow / Disable** through the host user-questions card, falling back to the native approval prompt when no card can be shown. Allow is remembered per installed version; Disable denies every tool call from the plugin until it is enabled again.
+- Add per-plugin Enable / Disable / Reset controls and a Disabled tab to the settings page (`security/policy`); changes apply on the next call without a restart.
+- Record the three-level risk (high / risk / none) and the declared tool names with every scan record; reports and the agent tools show it.
+- Scan after every plugin-manager change and on demand when the gate meets a plugin with no record for its installed version, in addition to the startup scan.
+- Retry dependency audits that ended unknown, keep agent reviews across forced rescans of unchanged content, and drop superseded records of the same package.
+- Fix `security_review` throwing `ACTION_ICON is not defined` after it had already stored the verdict.
+
 ## 0.4.6
 
 - Fix `/api/security/status` HTTP 404 with an explicit Typert host contract and connection lifecycle route registration.

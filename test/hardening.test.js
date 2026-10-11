@@ -242,7 +242,7 @@ test('typert contract: strict invocation descriptors match the registry grammar'
     endpoints.add(`${d.namespace}/${d.method}`);
   }
   assert.deepEqual([...endpoints].sort(), [
-    'security/configure', 'security/info', 'security/reenable', 'security/status', 'security/uninstall', 'security/upgrade',
+    'security/configure', 'security/info', 'security/policy', 'security/reenable', 'security/status', 'security/uninstall', 'security/upgrade',
   ]);
 });
 

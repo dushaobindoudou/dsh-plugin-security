@@ -41,7 +41,35 @@ The separately linked skill and stored reports remain until you remove them.
 - Uses bounded JavaScript AST analysis to identify local links such as whole-environment data entering a request body or decoded text entering an execution API. Package-wide co-occurrence alone does not escalate risk.
 - Reuses scans by package version, content fingerprint, and screening-rule revision. Content or rule changes trigger another scan; force rescan is available.
 - Provides searchable risk and action tabs, a whitelist, per-plugin actions, JSON/Markdown export, compact scan statistics, and bilingual settings metadata.
+- Gates tool calls: a call into a high-risk plugin asks **Allow once / Allow / Disable** as a question card; the settings page enables or disables each plugin, effective immediately.
 - Offers reversible disabling after a high-confidence malicious review, with profile backups and a bounded action log.
+
+## When scans run
+
+Each plugin version gets one full check (static screening + npm dependency audit); the result and its three-level risk are recorded in the state file. Scans run, reusing existing records:
+
+1. When this plugin starts (its first start after installation is the first full scan).
+2. After a plugin-manager install, removal or enable.
+3. When the call gate meets a plugin with no record for its installed version — that plugin is scanned before the decision.
+
+Content-fingerprint or rule-revision changes trigger a rescan; an audit that ended unknown after a network failure is retried. A forced rescan re-screens but keeps the agent review of unchanged content.
+
+## Call gate
+
+The gate listens on the host `tools/pre-execute` waterfall and attributes each tool call to the plugin that registered the tool (the loader entry seen at registration; tools registered before this plugin started are attributed from tool names extracted from source during scans).
+
+| Situation | Result |
+| --- | --- |
+| Plugin disabled | Denied; the model is told not to retry |
+| Installed version not scanned | Scan that plugin first, then apply the rows below |
+| High risk, no decision | Question card: **Allow once** (this call) / **Allow** (remembered for this version; a new version asks again) / **Disable** (deny every later call from the plugin) |
+| At risk, no risk, whitelisted or protected | Passed on to the host's remaining policies |
+
+The card uses the host `ctx.userQuestions` service, the channel dsh itself uses to ask the user structured questions. When no card can be shown (no web client, a delegated child agent) the gate falls back to the native approval prompt (allow once / reject). Concurrent calls into one plugin share one question.
+
+Each plugin row in the settings page has **Enable / Disable / Reset**: Enable equals Allow, Disable blocks every tool call, Reset returns to risk-based asking. Decisions live under `policies` in the state file and apply on the next call without a restart. Mode `off` disables the gate.
+
+Only tool calls are gated; hooks, system-prompt contributions and web UI from a plugin do not pass through `tools/pre-execute`. If the gate fails internally the call proceeds with a logged warning, but a disabled plugin is still denied.
 
 ## Risk labels and actions
 
@@ -52,7 +80,7 @@ The separately linked skill and stored reports remain until you remove them.
 | No risk found | No actionable risk found within this scan's scope. Capability records alone do not change this label. This is not a safety guarantee. |
 | Whitelist | Checks were skipped. These entries are separate from “No risk found.” |
 
-Risk labels and actions are independent. A high-risk label does **not** automatically disable a plugin. The old A–F grades are no longer shown; legacy report fields remain for compatibility.
+Risk labels are stored with each scan record and shown in reports and agent tools. Labels and actions are independent: a high-risk plugin is asked about at call time, but the label does **not** automatically disable it. The old A–F grades are no longer shown; legacy report fields remain for compatibility.
 
 ## Configuration
 
@@ -60,7 +88,7 @@ Configure these options in the settings page; configuration is stored under `$DS
 
 | Option | Default | Behavior |
 | --- | --- | --- |
-| Mode | `report-only` | `off`: no scans or enforcement. `report-only`: scan and save reports without changing target plugins. `enforce`: apply review-gated disabling. |
+| Mode | `report-only` | `off`: no scans, call gate or enforcement. `report-only`: scan and save reports without changing target plugins. `enforce`: apply review-gated disabling. |
 | Automatic disable threshold | `critical` | `never` disables automatic enforcement. `critical` and `high` both cover a confirmed high-confidence malicious review, treated as critical for enforcement. Static matches and advisories alone never trigger automatic quarantine. |
 | Upgrade suggestions | `false` | Suggest dependency upgrade commands when enabled; commands are not silently executed. |
 | Whitelist | Built-in protected entries | Add/remove custom package names through the whitelist tab or each plugin row. Entries skip checks; built-in protected entries cannot be removed in the UI. |

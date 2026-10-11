@@ -11,7 +11,7 @@ import * as security from '../lib/index.js';
 import { installSecurityTypertContract } from '../lib/remote.js';
 import { openState } from '../lib/state.js';
 
-const methods = ['info', 'status', 'configure', 'reenable', 'uninstall', 'upgrade'];
+const methods = ['info', 'status', 'configure', 'reenable', 'policy', 'uninstall', 'upgrade'];
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 function statusRequest(method = 'security/status', body) {

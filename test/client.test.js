@@ -71,6 +71,11 @@ function pageHarness() {
   c.apply({ get: (key) => key === 'connection' ? { rpc: { call: async (_base, method, payload) => {
     const request = payload.args.request;
     calls.push({ method, request });
+    if (method === 'security/policy') {
+      const policy = request.decision === null ? null : { decision: request.decision, version: '1', by: 'settings' };
+      report = { ...report, plugins: report.plugins.map((p) => p.name === request.name ? { ...p, policy } : p) };
+      return { ok: true, value: { ok: true, name: request.name, policy } };
+    }
     if (method === 'security/configure') {
       report = { ...report, config: { ...report.config, ...request } };
       report.mode = report.config.mode;
@@ -93,8 +98,8 @@ test('restored config, export toolbar, risk tabs and compact per-plugin actions 
   assert.doesNotMatch(html, /autoUpgradeLabel|ps-threats|ps-wl/);
   assert.ok(html.indexOf('导出 JSON') < html.indexOf('ps-tabs'));
   const tabs = nodes(tree).filter((n) => n.props.role === 'tab');
-  assert.equal(tabs.length, 7);
-  for (const label of ['全部', '高危', '有风险', '无风险', '停用', '升级', '白名单']) assert.ok(tabs.some((n) => render(n).includes(label)));
+  assert.equal(tabs.length, 8);
+  for (const label of ['全部', '高危', '有风险', '无风险', '已禁用', '停用', '升级', '白名单']) assert.ok(tabs.some((n) => render(n).includes(label)));
   const head = nodes(tree).find((n) => n.props.className === 'ps-card-head');
   assert.match(render(head), /alpha-plugin.*加入白名单.*卸载/);
   assert.ok(nodes(head).some((n) => n.type === 'button' && n.props.className.includes('ps-btn-small')));
@@ -171,4 +176,38 @@ test('restored config controls persist threshold and upgrade settings through th
   assert.ok(h.calls.some((call) => call.method === 'security/configure' && call.request.autoUpgrade === true));
   const nextRow = nodes(h.tree()).find((n) => n.props.className === 'ps-config-row' && render(n).includes('自动停用阈值'));
   assert.equal(nodes(nextRow).find((n) => n.type === 'button' && render(n).includes('从不')).props['aria-pressed'], 'true');
+});
+
+test('settings enable / disable / reset drive the per-plugin call gate through security/policy', async () => {
+  const h = pageHarness();
+  const row = () => nodes(h.tree()).filter((n) => n.props.className === 'ps-card').find((n) => render(n).includes('beta-plugin'));
+  const buttons = (node) => nodes(node).filter((n) => n.type === 'button').map((n) => ({ n, text: render(n).replace(/<[^>]+>/g, '') }));
+  const press = (text) => buttons(row()).find((b) => b.text === text).n.props.onClick();
+  // high risk without a decision: both enable (pre-approve) and disable are offered
+  assert.deepEqual(buttons(row()).map((b) => b.text).filter((t) => ['启用', '禁用', '恢复默认'].includes(t)), ['启用', '禁用']);
+  press('禁用');
+  await h.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.at(-1))), { method: 'security/policy', request: { name: 'beta-plugin', decision: 'block' } });
+  assert.match(render(row()), /调用已禁用/);
+  assert.match(render(row()), /所有工具调用都会被拦截/);
+  assert.deepEqual(buttons(row()).map((b) => b.text).filter((t) => ['启用', '禁用', '恢复默认'].includes(t)), ['启用', '恢复默认']);
+  nodes(h.tree()).find((n) => n.props.id === 'ps-tab-blocked').props.onClick();
+  assert.match(render(nodes(h.tree()).find((n) => n.props.id === 'ps-plugin-list')), /beta-plugin/);
+  nodes(h.tree()).find((n) => n.props.id === 'ps-tab-all').props.onClick();
+  press('启用');
+  await h.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.at(-1).request)), { name: 'beta-plugin', decision: 'allow' });
+  press('恢复默认');
+  await h.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.at(-1).request)), { name: 'beta-plugin', decision: null });
+  // whitelisted / protected rows skip the gate: no switch
+  const protectedRow = nodes(h.tree()).filter((n) => n.props.className === 'ps-card').find((n) => render(n).includes('@deepseek-ai'));
+  assert.ok(!buttons(protectedRow).some((b) => ['启用', '禁用'].includes(b.text)));
+});
+
+test('the page prefers the host-recorded risk level', () => {
+  const c = client();
+  const normal = { ...plugin, screening: { signal: { level: 'none' } }, findings: [] };
+  assert.equal(c.pluginRisk({ ...normal, risk: { level: 'high', reason: 'riskAdvisory' } }).level, 'high');
+  assert.equal(c.pluginRisk({ ...normal, deps: { worst: 'none', unknown: true } }).level, 'risk');
 });

@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-security",
-  "version": "0.4.6",
-  "description": "Plugin security review for DeepSeek Harness: dependency advisories, contextual static evidence, and reversible review-gated enforcement.",
+  "version": "0.5.0",
+  "description": "Plugin security review for DeepSeek Harness: dependency advisories, contextual static evidence, a call-time gate for high-risk plugins, and reversible review-gated enforcement.",
   "type": "module",
   "license": "MIT",
   "author": "dushaobindoudou",
@@ -13,6 +13,8 @@
     "./audit": "./lib/audit.js",
     "./state": "./lib/state.js",
     "./disposition": "./lib/disposition.js",
+    "./risk": "./lib/risk.js",
+    "./gate": "./lib/gate.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"

@@ -56,6 +56,8 @@ description: 审读 dsh 插件恶意性的方法论。当 security_scan 报告�
 
 ## 处置语义（写给用户解释用）
 
+- 调用拦截与审读独立：高危插件（高置信 malicious，或 high/critical 依赖漏洞）的工具被调用时，宿主会直接向用户弹出「允许一次 / 允许 / 禁用」问题卡片，**不需要也不应该由你代替用户回答**。若工具结果提示插件已被安全门禁用，不要重试该插件的工具，提示用户可在「设置 → 插件安全门」中重新启用
+
 - `security_review` 的判定**持久化**在 `~/.dsh/plugin-security/state.json`（同版本+同内容指纹+同规则版本不重扫；改码或规则更新会重扫），后续扫描直接沿用
 - `malicious` + **high 置信** + 处置模式（enforce）+ 自动停用阈值非 `never` + 目标不受保护 → 插件名从 profile bundles 移除**且包目录被隔离（重命名加 `.security-quarantined` 后缀）**，重启宿主后生效；设置页可一键撤销（解除隔离 + 加回 bundles）；medium/low 置信只进人工复核
 - `suspicious` 永远只是复核提示，任何模式都不自动禁用
