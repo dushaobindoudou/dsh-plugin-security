@@ -18,13 +18,7 @@ dsh --profile web
 
 Open **Settings → Security Gate**. The package declares the standard `dsh.bundle` patch and `dsh.client` Web entry point; you do not need to edit the profile manifest manually. For another existing profile, replace `web` with its name. Agent tools work without the Web connection service; the host must provide `tools`, `pluginManager`, and `typert`.
 
-To enable the bundled review skill for your agent, link it from the installed package (adjust the profile and `DSH_HOME` if needed):
-
-```sh
-mkdir -p "${DSH_HOME:-$HOME/.dsh}/skills"
-ln -sfn "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/dsh-plugin-security/skills/dsh-plugin-security" \
-  "${DSH_HOME:-$HOME/.dsh}/skills/dsh-plugin-security"
-```
+The bundled review skill (`dsh-plugin-security`) registers itself with the host skill catalog when the plugin starts, so agents can use it without a manual link.
 
 To remove the plugin:
 
@@ -32,7 +26,7 @@ To remove the plugin:
 dsh plugin --profile web remove dsh-plugin-security
 ```
 
-The separately linked skill and stored reports remain until you remove them.
+The local state under `$DSH_HOME/plugin-security/` remains until you remove it.
 
 ## What it does
 

@@ -423,3 +423,18 @@ test('a forced rescan keeps the agent review of unchanged content; security_revi
     }
   }
 });
+
+test('the bundled review skill registers with the host skill registry', async () => {
+  const { registerBundledSkill, parseSkill, SKILL_PATH } = await import('../lib/skill.js');
+  const registered = [];
+  const dispose = registerBundledSkill({ register: (skill) => { registered.push(skill); return () => {}; } });
+  assert.equal(typeof dispose, 'function');
+  assert.equal(registered[0].name, 'dsh-plugin-security');
+  assert.equal(registered[0].source, 'runtime');
+  assert.equal(registered[0].path, SKILL_PATH);
+  assert.match(registered[0].description, /security_review/);
+  assert.match(registered[0].content, /## 五问/);
+  assert.doesNotMatch(registered[0].content, /^---/);
+  assert.equal(registerBundledSkill(undefined), null);
+  assert.throws(() => parseSkill('no frontmatter'));
+});

@@ -18,13 +18,7 @@ dsh --profile web
 
 进入 **设置 → 插件安全门**。包已声明标准的 `dsh.bundle` 配置层与 `dsh.client` Web 入口，无需手改 profile 清单。其他已有 profile 将 `web` 替换成对应名称即可。没有 Web connection 的 profile 仍可使用 Agent 工具；宿主需提供 `tools`、`pluginManager`、`typert` 服务。
 
-如需让 Agent 使用随包提供的审读 skill，可从已安装包建立软链（按实际 profile 与 `DSH_HOME` 调整）：
-
-```sh
-mkdir -p "${DSH_HOME:-$HOME/.dsh}/skills"
-ln -sfn "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/dsh-plugin-security/skills/dsh-plugin-security" \
-  "${DSH_HOME:-$HOME/.dsh}/skills/dsh-plugin-security"
-```
+随包提供的审读 skill（`dsh-plugin-security`）会在插件启动后自动注册到宿主的 skill 目录，Agent 可直接使用，无需手动建立软链。
 
 卸载插件：
 
@@ -32,7 +26,7 @@ ln -sfn "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/dsh-plugin-security/s
 dsh plugin --profile web remove dsh-plugin-security
 ```
 
-单独建立的 skill 软链和本地报告需另行删除。
+本地状态文件（`$DSH_HOME/plugin-security/`）需另行删除。
 
 ## 核心能力
 
