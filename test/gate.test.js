@@ -212,12 +212,54 @@ test('an unscanned plugin is scanned on demand before the decision', async () =>
   const result = await gate.handle({ name: 't', agent: {}, signal: new AbortController().signal }, async () => ({ via: 'next' }));
   assert.deepEqual(scanned, ['new-plugin']);
   assert.equal(result.via, 'next');
-  // a scan that leaves no record cannot establish high risk
-  const empty = createCallGate({
-    state: freshState(), owners: (() => { const o = createToolOwners(); o.record({ name: 't' }, 'ghost'); return o; })(),
-    installedVersion: () => undefined, scan: async () => {}, userQuestions: () => undefined,
+});
+
+test('a plugin no scan can record is never passed silently: the user decides', async () => {
+  const state = freshState();
+  const asked = [];
+  const owners = createToolOwners();
+  owners.record({ name: 't' }, 'ghost');
+  const gate = createCallGate({
+    state, owners, installedVersion: () => '2.0.0', scan: async () => {},
+    userQuestions: () => ({ ask: async (request) => { asked.push(request.questions[0]); return answer(asked.length === 1 ? '允许一次' : '允许'); } }),
   });
-  assert.equal((await empty.handle({ name: 't', signal: new AbortController().signal }, async () => ({ via: 'next' }))).via, 'next');
+  const exec = () => ({ name: 't', agent: {}, signal: new AbortController().signal });
+  assert.equal((await gate.handle(exec(), async () => ({ via: 'next' }))).via, 'next');
+  assert.match(asked[0].question, /未完成安全检查的插件 ghost@2\.0\.0/);
+  assert.match(asked[0].detail, /尚未完成安全检查/);
+  // 允许 is remembered for this version even without a scan record
+  await gate.handle(exec(), async () => ({ via: 'next' }));
+  assert.equal((await gate.handle(exec(), async () => ({ via: 'next' }))).via, 'next');
+  assert.equal(asked.length, 2);
+  // without a question channel it falls back to host approval, not a pass
+  const headless = createCallGate({ state: freshState(), owners, installedVersion: () => undefined, scan: async () => {}, userQuestions: () => undefined });
+  assert.equal((await headless.handle({ name: 't', signal: new AbortController().signal }, async () => ({ via: 'next' }))).kind, 'ask');
+});
+
+test('an audit that ended unknown is retried at call time, at most once per window', async () => {
+  const state = freshState();
+  record(state, 'offline-plugin', '1.0.0', { level: 'risk', reason: 'riskIncomplete' }, { deps: { worst: 'none', unknown: true, advisories: [] } });
+  const owners = createToolOwners();
+  owners.record({ name: 't' }, 'offline-plugin');
+  let clock = 0;
+  let scans = 0;
+  let online = false;
+  const gate = createCallGate({
+    state, owners, installedVersion: () => '1.0.0', now: () => clock, auditRetryMs: 1000,
+    scan: async () => {
+      scans += 1;
+      if (online) record(state, 'offline-plugin', '1.0.0', HIGH, { deps: { worst: 'critical', unknown: false, advisories: [] } });
+    },
+    userQuestions: () => ({ ask: async () => answer('禁用') }),
+  });
+  const call = () => gate.handle({ name: 't', agent: {}, signal: new AbortController().signal }, async () => ({ via: 'next' }));
+  assert.equal((await call()).via, 'next', 'still offline: risk, not high');
+  await call();
+  assert.equal(scans, 1, 'no second retry inside the window');
+  clock = 2000;
+  online = true;
+  assert.equal((await call()).kind, 'deny', 'the retried audit found the advisory and the user disabled it');
+  assert.equal(scans, 2);
 });
 
 test('tools registered before the gate started are attributed from scan-record tool names', async () => {
@@ -273,7 +315,28 @@ test('tools registered before the gate are attributed by their execute source, b
   assert.equal(result.kind, 'deny');
 });
 
-test('concurrent calls into one plugin share a single question', async () => {
+test('允许一次 admits only the call that asked; concurrent calls each get their own answer', async () => {
+  let asks = 0;
+  const gates = [];
+  const h = harness({ userQuestions: () => ({ ask: async () => {
+    asks += 1;
+    await new Promise((resolve) => gates.push(resolve));
+    return answer('允许一次');
+  } }) });
+  record(h.state, 'risky-plugin', '1.0.0', HIGH);
+  const pending = [h.call('risky_tool', { callId: 'a' }), h.call('risky_tool', { callId: 'b' }), h.call('risky_tool', { callId: 'c' })];
+  // release questions one at a time as they appear
+  for (let i = 0; i < 3; i += 1) {
+    while (gates.length === 0) await new Promise((r) => setImmediate(r));
+    gates.shift()();
+  }
+  const results = await Promise.all(pending);
+  assert.equal(asks, 3, 'one question per call');
+  assert.ok(results.every((r) => r.via === 'next'));
+  assert.equal(h.state.getPolicy('risky-plugin'), null);
+});
+
+test('a stored 允许 settles every call that waited on the same question', async () => {
   let release;
   const gateOpen = new Promise((resolve) => { release = resolve; });
   let asks = 0;

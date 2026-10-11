@@ -67,7 +67,7 @@ function runTask(env = {}) {
   const out = sh('dsh', ['e2e', '--json', 'call the echo tool'], { cwd: work, env: { FAKE_LLM_KEY: 'e2e-placeholder', E2E_QUESTION_LOG: questionLog, ...env }, allowFail: true });
   const events = out.stdout.split('\n').filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
   const result = events.find((e) => e.type === 'tool_result');
-  return { status: out.status, result, events, stderr: out.stderr };
+  return { status: out.status, result, results: events.filter((e) => e.type === 'tool_result'), events, stderr: out.stderr };
 }
 
 const ran = (run) => run.result?.status === 'completed' && /E2E_FIXTURE_ECHO:hello-e2e/.test(String(run.result?.result));
@@ -135,6 +135,16 @@ try {
   check('允许一次 stores no decision', state.getPolicy('dsh-security-e2e-fixture') === null, JSON.stringify(state.getPolicy('dsh-security-e2e-fixture')));
   const afterOnce = runTask();
   check('the next call asks again (and is refused without an answer)', !ran(afterOnce), JSON.stringify(afterOnce.result));
+
+  // ---- 2b. 允许一次 is exact: two calls in one step get two questions -----
+  const askedBeforePair = questions().length;
+  const setCalls = (calls) => fetch(`http://127.0.0.1:${fake.port}/__control`, { method: 'POST', body: JSON.stringify({ calls }) });
+  await setCalls(2);
+  const pair = runTask({ E2E_ANSWER: '允许一次' });
+  await setCalls(1);
+  check('two calls in one step: 允许一次 is asked per call and both run',
+    pair.results.length === 2 && pair.results.every((r) => /E2E_FIXTURE_ECHO:hello-e2e/.test(String(r.result))) && questions().length - askedBeforePair === 2,
+    JSON.stringify({ results: pair.results, asked: questions().length - askedBeforePair }));
 
   // ---- 3. 允许 ------------------------------------------------------------
   const allow = runTask({ E2E_ANSWER: '允许' });
