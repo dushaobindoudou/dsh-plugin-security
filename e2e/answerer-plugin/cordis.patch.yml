@@ -1,0 +1,4 @@
+# E2E answerer bundle: stands in for the person clicking the question card.
+- insert:
+    - id: security-e2e-answerer
+      name: dsh-security-e2e-answerer

@@ -1,0 +1,17 @@
+{
+  "name": "dsh-security-e2e-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TEST FIXTURE ONLY for dsh-plugin-security e2e: a harmless echo tool packaged with deliberately risky-looking signals.",
+  "type": "module",
+  "main": "lib/index.js",
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "minimist": "1.2.0"
+  }
+}

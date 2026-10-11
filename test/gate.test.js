@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   packageOfModule, ownerOfContext, createToolOwners, installToolAttribution, decideGate,
-  createCallGate, choiceOf, buildQuestion, CHOICE_LABELS, QUESTION_ID,
+  createCallGate, choiceOf, buildQuestion, CHOICE_LABELS, QUESTION_ID, createSourceIndex, functionSourceOf,
 } from '../lib/gate.js';
 import { openState } from '../lib/state.js';
 import { toolNamesOf } from '../lib/behavior.js';
@@ -227,11 +227,50 @@ test('tools registered before the gate started are attributed from scan-record t
     state: h.state, owners: createToolOwners(), installedVersion: () => '1.0.0', scan: async () => {},
     userQuestions: () => ({ ask: async () => answer('禁用') }),
   });
-  assert.equal(gate.ownerOf({ name: 'early_tool' }), 'early-plugin');
+  assert.equal(await gate.ownerOf({ name: 'early_tool' }), 'early-plugin');
   assert.equal((await gate.handle({ name: 'early_tool', agent: {}, signal: new AbortController().signal }, async () => ({}))).kind, 'deny');
   // a name claimed by two packages is ambiguous and not attributed
   record(h.state, 'other-plugin', '1.0.0', NONE, { tools: ['early_tool'] });
-  assert.equal(gate.ownerOf({ name: 'early_tool' }), null);
+  assert.equal(await gate.ownerOf({ name: 'early_tool' }), null);
+});
+
+test('tools registered before the gate are attributed by their execute source, before any scan record exists', async () => {
+  const definition = {
+    name: 'late_seen_tool',
+    async execute(args) { return { echo: String(args?.text ?? '') + 'unique-marker-7' }; },
+  };
+  const source = functionSourceOf(definition);
+  let loads = 0;
+  const index = createSourceIndex(async () => {
+    loads += 1;
+    return [
+      { name: 'fresh-plugin', texts: [`export const tool = { name: 'late_seen_tool', ${source} };`] },
+      { name: 'unrelated', texts: ['export const x = 1;'] },
+    ];
+  });
+  assert.equal(await index.ownerOf(definition), 'fresh-plugin');
+  assert.equal(await index.ownerOf(definition), 'fresh-plugin');
+  assert.equal(loads, 1, 'the package index is built once');
+  assert.equal(functionSourceOf({ execute: Math.max }), null, 'native code never matches');
+  assert.equal(functionSourceOf({ execute: () => 1 }), null, 'trivial bodies are too short to attribute');
+  const ambiguous = createSourceIndex(async () => [{ name: 'a', texts: [source] }, { name: 'b', texts: [source] }]);
+  assert.equal(await ambiguous.ownerOf(definition), null);
+  index.invalidate();
+  await index.ownerOf(definition);
+  assert.equal(loads, 2);
+
+  // end to end through the gate: no wrapper record, no scan record → scan, then ask
+  const state = freshState();
+  const scanned = [];
+  const gate = createCallGate({
+    state, owners: createToolOwners(), lookup: () => definition, sources: index,
+    installedVersion: () => '1.0.0',
+    scan: async (name) => { scanned.push(name); record(state, name, '1.0.0', HIGH); },
+    userQuestions: () => ({ ask: async () => answer('禁用') }),
+  });
+  const result = await gate.handle({ name: 'late_seen_tool', agent: {}, signal: new AbortController().signal }, async () => ({ via: 'next' }));
+  assert.deepEqual(scanned, ['fresh-plugin']);
+  assert.equal(result.kind, 'deny');
 });
 
 test('concurrent calls into one plugin share a single question', async () => {

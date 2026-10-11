@@ -1,0 +1,14 @@
+{
+  "name": "dsh-security-e2e-answerer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TEST FIXTURE ONLY: answers the plugin-security gate question from E2E_ANSWER so headless e2e runs can exercise the user-questions path.",
+  "type": "module",
+  "main": "lib/index.js",
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

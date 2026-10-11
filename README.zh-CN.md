@@ -122,6 +122,8 @@ pnpm test
 npm pack --dry-run
 ```
 
+端到端测试 `npm run test:e2e` 在临时 `DSH_HOME` 中用 headless 模板建立 profile，安装本包与 `e2e/` 下的两个测试插件（一个无害但被判为高危的回显插件，一个代替用户点击问题卡片的应答插件），通过本地确定性的假模型驱动真实 `dsh` 调用工具，覆盖首次调用、允许一次、允许、禁用、设置页启用、白名单与关闭模式。需要全局 `dsh` 与访问 npm registry 的网络，不会改动你自己的 profile。
+
 测试覆盖检测与误报样例、profile、缓存失效、可撤销处置、设置交互，以及真实 Cordis/Typert/网关 RPC 生命周期。共享宿主协议包按 [dsh 官方打包指南](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md) 同时声明 peer 与开发依赖。
 
 开发及发布步骤见 [CONTRIBUTING.md](CONTRIBUTING.md)。包直接分发 JavaScript 产物，无需消费者运行构建脚本或本包的安装脚本。

@@ -122,6 +122,8 @@ pnpm test
 npm pack --dry-run
 ```
 
+`npm run test:e2e` creates a headless profile in a temporary `DSH_HOME`, installs this package and the two fixtures under `e2e/` (a harmless echo plugin that is high risk on purpose, and an answerer standing in for the person clicking the question card), and drives the real `dsh` through a deterministic local model: first call, allow once, allow, disable, settings enable, whitelist and mode off. It needs the global `dsh` launcher and npm registry access, and never touches your own profiles.
+
 Tests cover detection and false-positive cases, profiles, cache invalidation, reversible disposition, settings behavior, and real Cordis/Typert/gateway RPC lifecycles. Shared host protocol packages are declared as peer and development dependencies per the [dsh packaging guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps. Runtime JavaScript is shipped directly; consumers need no build script or install-time code execution from this package.
