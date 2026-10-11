@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createManagerBridge, setActiveManager, disablePlugin, enablePlugin, removePlugin } from '../lib/manager.js';
+import { createManagerBridge, setActiveManager, disablePlugin, enablePlugin, removePlugin, reconcileBlocks } from '../lib/manager.js';
 import { createCallGate, createToolOwners, decideGate, QUESTION_ID } from '../lib/gate.js';
 import { openState } from '../lib/state.js';
 import { SecurityRemote } from '../lib/remote.js';
@@ -165,5 +165,31 @@ test('settings policy and uninstall RPCs call the native plugin manager', async 
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
+  }
+});
+
+test('gate blocks stored before the sync move onto the plugin manager at startup', async () => {
+  const state = openState(mkdtempSync(join(tmpdir(), 'security-manager-reconcile-')));
+  state.setPolicy('old-block', { decision: 'block', by: 'user-prompt' });
+  state.setPolicy('already-off', { decision: 'block', by: 'settings' });
+  state.setPolicy('not-a-bundle', { decision: 'block', by: 'settings' });
+  state.setPolicy('stubborn', { decision: 'block', by: 'settings' });
+  state.setPolicy('allowed', { decision: 'allow', version: '1' });
+  const manager = fakeManager([
+    { name: 'old-block', enabled: true }, { name: 'already-off', enabled: false }, { name: 'stubborn', enabled: true }, { name: 'allowed', enabled: true },
+  ], { fail: { stubborn: 'read-only' } });
+  assert.deepEqual(await reconcileBlocks(state, () => false), [], 'nothing happens without a manager');
+  const reset = setActiveManager(createManagerBridge(manager));
+  try {
+    assert.deepEqual(await reconcileBlocks(state, () => false), ['old-block', 'already-off']);
+    assert.equal(manager.state.get('old-block').enabled, false);
+    assert.equal(state.getPolicy('old-block'), null);
+    assert.equal(state.getPolicy('already-off'), null);
+    assert.equal(state.getPolicy('not-a-bundle').decision, 'block', 'non-bundles keep the gate block');
+    assert.equal(state.getPolicy('stubborn').decision, 'block', 'a failed native disable keeps the gate block');
+    assert.equal(state.getPolicy('allowed').decision, 'allow');
+    assert.ok(state.readAuditLog().some((e) => e.kind === 'policy-moved-to-plugin-manager' && e.name === 'old-block'));
+  } finally {
+    reset();
   }
 });
