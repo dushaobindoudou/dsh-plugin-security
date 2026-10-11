@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in the scanner, the call gate or the settings page does not behave as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security-sensitive reports (gate bypass, unauthorized disable, data leak) go through the private advisory link instead.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `dsh --version`, the plugin version, Node.js version and OS.
+      placeholder: dsh 0.2.0-rc.2 · dsh-plugin-security 0.5.0 · Node 24 · macOS 15
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest plugin or profile that shows it. `npm run test:e2e` fixtures are a good starting point.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Redacted report excerpts, `remote-diag.json`, or host log lines starting with `plugin-security:`. Remove secrets and private paths.

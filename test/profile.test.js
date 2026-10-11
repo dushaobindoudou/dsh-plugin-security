@@ -275,22 +275,29 @@ test('integration: a rule revision invalidates old scores and cached evidence re
   assert.ok(evil.findings.some((f) => f.kind === 'capability' && f.scope === 'runtime'));
 });
 
-test('integration: cached audit failures and scan truncation remain visible for risk classification', async () => {
+test('integration: unknown audits are retried and scan truncation stays visible on cached records', async () => {
   _clearAuditCache();
   const env = makeEnv();
   const failedFetch = async () => ({ ok: false, status: 503 });
   const fresh = await scanProfile(env, {}, { force: true, fetchImpl: failedFetch });
   const evil = fresh.plugins.find((p) => p.name === 'evil-pkg');
   assert.ok(evil.deps.errors.length);
+  assert.equal(evil.risk.level, 'risk', 'an unknown audit is incomplete, never clean');
+  // unknown is not a result: the next pass audits again instead of reusing it
+  const retried = await scanProfile(env, {}, { fetchImpl: failedFetch });
+  const again = retried.plugins.find((p) => p.name === 'evil-pkg');
+  assert.equal(again.cached, false);
+  assert.ok(Object.values(again.deps.results).some((d) => d.unknown));
+
+  await scanProfile(env, {}, { fetchImpl: mockFetch() });
   const state = openState(env.dshHome);
   const [key, entry] = Object.entries(state.readScanIndex()).find(([, e]) => e.name === 'evil-pkg');
+  assert.equal(entry.deps.unknown, false);
   state.putScan(key, { ...entry, filesTruncated: true });
   const cached = await scanProfile(env, {}, { fetchImpl: failedFetch });
   const next = cached.plugins.find((p) => p.name === 'evil-pkg');
   assert.equal(next.cached, true);
   assert.equal(next.filesTruncated, true);
-  assert.ok(next.deps.errors.length);
-  assert.ok(Object.values(next.deps.results).some((d) => d.unknown));
 });
 
 test('integration: agent review re-decides the disposition without a rescan', async () => {
@@ -308,7 +315,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
 
   // a confident benign review overrides the static signal
   const enforce = { mode: 'enforce', autoDisableAt: 'critical' };
-  const benign = redecideEntry(
+  const benign = await redecideEntry(
     { ...recorded, review: { verdict: 'benign', confidence: 'high', reason: 'test', by: 'agent', at: new Date().toISOString() } },
     enforce, env.profileRoot,
   );
@@ -318,7 +325,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
 
   // a malicious review disables (profile edit) even from report-only mode
   const reportOnlyConfig = { mode: 'enforce', autoDisableAt: 'critical' };
-  const malicious = redecideEntry(
+  const malicious = await redecideEntry(
     { ...recorded, review: { verdict: 'malicious', confidence: 'high', reason: 'test', by: 'agent', at: new Date().toISOString() } },
     reportOnlyConfig, env.profileRoot,
   );
@@ -329,7 +336,7 @@ test('integration: agent review re-decides the disposition without a rescan', as
   const afterManifest = JSON.parse(readFileSync(join(env.profileRoot, 'package.json'), 'utf8'));
   assert.ok(!afterManifest.dsh.profile.bundles.includes('evil-pkg'), 'malicious verdict removes the plugin');
   // low-confidence malicious must NOT disable (audit P1-10 regression)
-  const lowConf = redecideEntry(
+  const lowConf = await redecideEntry(
     { ...recorded, review: { verdict: 'malicious', confidence: 'low', reason: 'gut', by: 'agent', at: new Date().toISOString() } },
     reportOnlyConfig, env.profileRoot,
   );

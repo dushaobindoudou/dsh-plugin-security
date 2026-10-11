@@ -1,0 +1,4 @@
+# E2E fixture bundle: mount the echo plugin row.
+- insert:
+    - id: security-e2e-fixture
+      name: dsh-security-e2e-fixture
