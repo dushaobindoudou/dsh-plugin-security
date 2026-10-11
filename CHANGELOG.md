@@ -18,6 +18,7 @@
 - A plugin no scan can record is asked about instead of passing; dependency audits that ended unknown are retried by the next scan and at call time (at most once per plugin every five minutes).
 - A forced rescan keeps the agent review of unchanged content; superseded records of the same package are dropped.
 - Tools registered before the gate started are attributed by their `execute` source text, so the first call into a newly installed plugin is gated (found by the e2e run).
+- Host-rendered text (the question card, denial messages) follows the dsh UI language set in Settings → General, read per question; `DSH_LOCALE` overrides it and the process locale is the fallback.
 - Screening revision `risk-status-4`: existing records are rescanned once after upgrading.
 
 ### Fixed

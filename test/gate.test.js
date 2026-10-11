@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import {
   packageOfModule, ownerOfContext, createToolOwners, installToolAttribution, decideGate,
   createCallGate, choiceOf, buildQuestion, CHOICE_LABELS, QUESTION_ID, createSourceIndex, functionSourceOf,
+  localeOf, uiLocalePreference,
 } from '../lib/gate.js';
 import { openState } from '../lib/state.js';
 import { toolNamesOf } from '../lib/behavior.js';
@@ -500,4 +501,33 @@ test('the bundled review skill registers with the host skill registry', async ()
   assert.doesNotMatch(registered[0].content, /^---/);
   assert.equal(registerBundledSkill(undefined), null);
   assert.throws(() => parseSkill('no frontmatter'));
+});
+
+test('host text follows DSH_LOCALE, then the dsh UI language, then the process locale', async () => {
+  const loader = (preference) => ({ *entries() {
+    yield { options: { id: 'other', name: 'x', config: {} } };
+    yield { options: { id: 'locale', name: '@deepseek-ai/dsh-client-locale', config: preference === undefined ? {} : { preference } } };
+  } });
+  assert.equal(uiLocalePreference(loader('zh')), 'zh');
+  assert.equal(uiLocalePreference(loader(undefined)), undefined);
+  assert.equal(uiLocalePreference({ entries() { throw new Error('gone'); } }), undefined);
+  assert.equal(uiLocalePreference(undefined), undefined);
+  assert.equal(localeOf({ LANG: 'en_US.UTF-8' }, 'zh'), 'zh', 'the UI preference beats the process locale');
+  assert.equal(localeOf({ LANG: 'zh_CN.UTF-8' }, 'en'), 'en');
+  assert.equal(localeOf({ DSH_LOCALE: 'en', LANG: 'zh_CN.UTF-8' }, 'zh'), 'en', 'DSH_LOCALE overrides everything');
+  assert.equal(localeOf({ LANG: 'zh_CN.UTF-8' }), 'zh');
+  // read per question, so a switch in Settings applies to the next one
+  let current = 'en';
+  const asked = [];
+  const state = freshState();
+  record(state, 'p', '1', HIGH);
+  const owners = createToolOwners();
+  owners.record({ name: 't' }, 'p');
+  const gate = createCallGate({ state, owners, installedVersion: () => '1', scan: async () => {}, lang: () => current,
+    userQuestions: () => ({ ask: async (r) => { asked.push(r.questions[0].options[0].label); return answer(asked.length === 1 ? 'Allow once' : '允许一次'); } }) });
+  const call = () => gate.handle({ name: 't', agent: {}, signal: new AbortController().signal }, async () => ({ via: 'next' }));
+  await call();
+  current = 'zh';
+  await call();
+  assert.deepEqual(asked, ['Allow once', '允许一次']);
 });

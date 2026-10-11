@@ -64,7 +64,7 @@ async function pluginState() {
 
 /** One headless run; returns the gated tool's result event. */
 function runTask(env = {}) {
-  const out = sh('dsh', ['e2e', '--json', 'call the echo tool'], { cwd: work, env: { FAKE_LLM_KEY: 'e2e-placeholder', E2E_QUESTION_LOG: questionLog, ...env }, allowFail: true });
+  const out = sh('dsh', ['e2e', '--json', 'call the echo tool'], { cwd: work, env: { FAKE_LLM_KEY: 'e2e-placeholder', E2E_QUESTION_LOG: questionLog, DSH_LOCALE: 'zh', ...env }, allowFail: true });
   const events = out.stdout.split('\n').filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
   const result = events.find((e) => e.type === 'tool_result');
   return { status: out.status, result, results: events.filter((e) => e.type === 'tool_result'), events, stderr: out.stderr };

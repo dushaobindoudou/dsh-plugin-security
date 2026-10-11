@@ -71,7 +71,7 @@ The gate listens on the host `tools/pre-execute` waterfall and attributes each t
 - **Allow** is remembered for the plugin's **installed version**; a new version asks again.
 - **Disable** disables the plugin through the plugin manager, exactly like the Plugins page (the dependency stays installed); this and every later call is denied.
 
-The question uses the host `ctx.userQuestions` service, the channel dsh itself uses to ask structured questions. When no card can be shown (no web client, a delegated child agent) it falls back to the native approval prompt (allow once / reject). If the gate fails internally the call proceeds with a logged warning, but a disabled plugin is always denied.
+The question uses the host `ctx.userQuestions` service, the channel dsh itself uses to ask structured questions, in the language chosen under Settings → General. When no card can be shown (no web client, a delegated child agent) it falls back to the native approval prompt (allow once / reject). If the gate fails internally the call proceeds with a logged warning, but a disabled plugin is always denied.
 
 ## In step with the Plugins page
 
